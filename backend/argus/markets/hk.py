@@ -6,10 +6,8 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-import akshare as ak
 import yfinance as yf
 
-from ..utils import logger
 from .base import (
     Candle,
     Fundamentals,
@@ -129,26 +127,55 @@ class HKAdapter(MarketAdapter):
         )
 
     async def _search(self, query: str, limit: int = 10) -> list[SymbolSearchResult]:
-        # akshare ships a HK ticker board; use it for richer Chinese names
-        try:
-            df = await _to_thread(lambda: ak.stock_hk_spot_em())
-        except Exception as e:
-            logger.warning(f"akshare HK board failed: {e}")
-            return []
+        """Resolve search queries WITHOUT scanning the full HK board.
+
+        akshare's `stock_hk_spot_em()` paginates through Eastmoney for
+        every call (often 30-70s, frequently times out). For an
+        autocomplete UX we instead:
+          * pure-digit queries → synthesise the canonical symbol on the
+            fly (instant, no network); the Stock page will fetch the
+            actual name when the user clicks through.
+          * text queries (Chinese / English) → match against a curated
+            list of widely-traded HK tickers in `popular.py`.
+        Long-tail tickers are still reachable via numeric input.
+        """
+        from .popular import search_hk
+
         q = query.strip()
         if not q:
             return []
+
         if q.isdigit():
-            mask = df["代码"].astype(str).str.lstrip("0").str.startswith(q.lstrip("0") or "0")
-        else:
-            mask = df["名称"].astype(str).str.contains(q, regex=False, case=False)
-        hits = df[mask].head(limit)
+            # HK codes are at most 5 digits — anything longer can't be HK.
+            if len(q) > 5:
+                return []
+            code5 = q.lstrip("0").zfill(5) if q.lstrip("0") else "00000"
+            # First check the curated list for a name match.
+            hits = search_hk(q, limit=limit)
+            results: list[SymbolSearchResult] = []
+            seen: set[str] = set()
+            for code, display in hits:
+                sym = f"{code.zfill(5)}.HK"
+                if sym in seen:
+                    continue
+                seen.add(sym)
+                results.append(SymbolSearchResult(
+                    symbol=sym, name=display, market="HK", exchange="HKEX",
+                ))
+            primary = f"{code5}.HK"
+            if primary not in seen:
+                results.insert(0, SymbolSearchResult(
+                    symbol=primary, name="", market="HK", exchange="HKEX",
+                ))
+            return results[:limit]
+
+        # Text query — search the curated list.
         return [
             SymbolSearchResult(
-                symbol=self.normalize(str(row["代码"])),
-                name=str(row["名称"]),
+                symbol=f"{code.zfill(5)}.HK",
+                name=display,
                 market="HK",
                 exchange="HKEX",
             )
-            for _, row in hits.iterrows()
+            for code, display in search_hk(q, limit=limit)
         ]

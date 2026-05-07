@@ -43,16 +43,36 @@ def get_adapter(market_or_symbol: str) -> MarketAdapter:
 
 
 async def search_symbols(query: str, limit: int = 8) -> list[SymbolSearchResult]:
-    """Fan out to every adapter; aggregate results."""
-    results = await asyncio.gather(
-        *(_ADAPTERS[m].search(query, limit=limit) for m in MARKETS),
-        return_exceptions=True,
-    )
+    """Fan out to every adapter, with a per-adapter timeout so one slow
+    upstream (yfinance.Search, akshare boards) can't drag down the rest.
+
+    The HK and CN adapters are now O(1) curated-list lookups, so the
+    timeout matters mostly as a safety net for the US adapter, which
+    still hits Yahoo's search API.
+    """
+    PER_ADAPTER_TIMEOUT = 5.0
+
+    async def _safe(market: Market) -> list[SymbolSearchResult]:
+        try:
+            return await asyncio.wait_for(
+                _ADAPTERS[market].search(query, limit=limit),
+                timeout=PER_ADAPTER_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            from ..utils import logger
+            logger.warning(f"search timeout for {market} on query='{query[:30]}'")
+            return []
+        except Exception as e:
+            from ..utils import logger
+            logger.warning(f"search error for {market}: {e}")
+            return []
+
+    results = await asyncio.gather(*(_safe(m) for m in MARKETS))
     out: list[SymbolSearchResult] = []
     for r in results:
-        if isinstance(r, list):
-            out.extend(r)
-    # Stable de-dup
+        out.extend(r)
+
+    # Stable de-dup by symbol
     seen: set[str] = set()
     uniq: list[SymbolSearchResult] = []
     for r in out:

@@ -179,28 +179,61 @@ class CNAdapter(MarketAdapter):
         )
 
     async def _search(self, query: str, limit: int = 10) -> list[SymbolSearchResult]:
-        try:
-            spot = await _to_thread(lambda: ak.stock_zh_a_spot_em())
-        except Exception as e:
-            logger.warning(f"akshare spot board failed: {e}")
-            return []
+        """Resolve search queries WITHOUT scanning the full A-share board.
+
+        akshare's `stock_zh_a_spot_em()` returns 5,000+ rows and is slow
+        + flaky on every keystroke. We instead:
+          * pure-digit queries → construct the canonical symbol directly
+            via `_add_suffix` (handles SH/SZ/STAR/ChiNext/BJ).
+          * text queries (Chinese / English) → match a curated list of
+            widely-traded A-shares in `popular.py`.
+        """
+        from .popular import search_cn
+
         q = query.strip()
         if not q:
             return []
-        # Match by code prefix or name substring
+
+        def _exchange(code: str) -> str:
+            return "SSE" if code.startswith(("60", "68", "9")) else (
+                "BJSE" if code.startswith(("8", "4")) else "SZSE"
+            )
+
         if q.isdigit():
-            mask = spot["代码"].astype(str).str.startswith(q)
-        else:
-            mask = spot["名称"].astype(str).str.contains(q, regex=False)
-        hits = spot[mask].head(limit)
+            # A-share codes are exactly 6 digits — any other length can't
+            # be a CN ticker. We still allow shorter prefixes so the
+            # curated list can prefix-match while typing.
+            hits = search_cn(q, limit=limit)
+            results: list[SymbolSearchResult] = []
+            seen: set[str] = set()
+            for code, display in hits:
+                sym = _add_suffix(code)
+                if sym in seen:
+                    continue
+                seen.add(sym)
+                results.append(SymbolSearchResult(
+                    symbol=sym, name=display, market="CN", exchange=_exchange(code),
+                ))
+            # Synthesise the direct ticker only when length is exactly 6 —
+            # avoids phantom CN matches when the user is typing an HK code.
+            if len(q) == 6:
+                primary = _add_suffix(q)
+                if primary not in seen:
+                    results.insert(0, SymbolSearchResult(
+                        symbol=primary, name="", market="CN",
+                        exchange=_exchange(q),
+                    ))
+            return results[:limit]
+
+        # Text query — search the curated list.
         return [
             SymbolSearchResult(
-                symbol=self.normalize(str(row["代码"])),
-                name=str(row["名称"]),
+                symbol=_add_suffix(code),
+                name=display,
                 market="CN",
-                exchange="SSE" if str(row["代码"]).startswith(("60", "68")) else "SZSE",
+                exchange=_exchange(code),
             )
-            for _, row in hits.iterrows()
+            for code, display in search_cn(q, limit=limit)
         ]
 
     async def _news(self, symbol: str, limit: int = 10) -> list[dict]:

@@ -25,7 +25,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     // Dashboard
     "dashboard.badge": "multi-agent · multi-market",
     "dashboard.alpha": "v0.1 alpha",
-    "dashboard.heroLine1": "Five analysts.",
+    "dashboard.heroLine1": "Six analysts.",
     "dashboard.heroLine2": "One ticker.",
     "dashboard.heroBrand": "Argus.",
     "dashboard.heroDesc":
@@ -231,7 +231,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     // Dashboard
     "dashboard.badge": "多智能体 · 多市场",
     "dashboard.alpha": "v0.1 alpha",
-    "dashboard.heroLine1": "五位分析师，",
+    "dashboard.heroLine1": "六位分析师，",
     "dashboard.heroLine2": "一只股票，",
     "dashboard.heroBrand": "Argus 给你答案。",
     "dashboard.heroDesc":
