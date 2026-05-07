@@ -16,7 +16,11 @@ the verdict, all streamed to a glass-morphism web UI.
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688.svg)](https://fastapi.tiangolo.com)
 [![Tailwind v4](https://img.shields.io/badge/Tailwind-v4-38bdf8.svg)](https://tailwindcss.com)
 
-[Quickstart](#quickstart) · [Why Argus](#why-argus) · [The Committee](#the-committee) · [Architecture](#architecture) · [中文](#中文)
+[Quickstart](#quickstart) · [Why Argus](#why-argus) · [The Committee](#the-committee) · [Stock deep-dive](#stock-deep-dive-page) · [Architecture](#architecture) · [中文](#中文)
+
+<br/>
+
+<img src="docs/01.png" alt="Argus dashboard — six analysts, one ticker" width="900" />
 
 </div>
 
@@ -89,6 +93,16 @@ Each ticker is read by a panel of LLM personas, then synthesised:
 | **Flow Analyst**            | Insider transactions · short interest (US) · Northbound flow · Dragon-Tiger list (A-share) — what *smart money* is doing |
 | **Chief Investment Officer** | Resolves disagreements → action · conviction · horizon · entry · stop · key risks  |
 
+The committee panel and the synthesised verdict, live in the browser:
+
+<p align="center">
+  <img src="docs/03.png" alt="AI Investment Committee — six analyst agents streaming reasoning live" width="900" />
+</p>
+
+<p align="center">
+  <img src="docs/04.png" alt="CIO verdict card — action, conviction, horizon, entry / stop, key risks" width="900" />
+</p>
+
 ## Three markets, one workstation
 
 | Market               | Coverage                                  | Data source (default)        | Search example                |
@@ -113,6 +127,19 @@ The first configured key wins, in priority order. UI-stored keys override `.env`
 | **Ollama** (local)        | `llama3.1`                          | 100% offline, BYO model                |
 
 Open Settings → paste a key → it works immediately. No restart.
+
+## Stock deep-dive page
+
+<p align="center">
+  <img src="docs/02.png" alt="Stock deep-dive: candlestick + indicators + fundamentals + news" width="900" />
+</p>
+
+Each ticker page combines a candlestick + volume chart with 12 technical
+indicators (RSI · MACD · Bollinger · KDJ · ATR · OBV …), a live
+fundamentals snapshot, fresh news (with a Finnhub fallback for thinly-
+covered US tickers), and the AI committee panel below. The Run button
+kicks off the six-agent debate; you can navigate away mid-run and the
+state stays alive when you come back.
 
 ## Quickstart
 
