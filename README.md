@@ -6,8 +6,8 @@
 
 An open-source AI **investment committee** for US stocks, A-shares, and Hong Kong stocks.
 Six specialised analyst agents — including a dedicated **Flow Analyst** that reads
-insider trades, short interest, northbound flow, dragon-tiger list, and margin
-balance — debate a ticker in real time and a Chief Investment Officer synthesises
+insider trades, short interest, northbound flow, and the dragon-tiger list —
+debate a ticker in real time and a Chief Investment Officer synthesises
 the verdict, all streamed to a glass-morphism web UI.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -68,7 +68,7 @@ The whole deliberation streams to your screen, token by token. It looks the way 
 |                              | Argus                                              | Yahoo / TradingView | A single ChatGPT prompt    |
 | ---------------------------- | -------------------------------------------------- | ------------------- | -------------------------- |
 | **Multi-perspective analysis** | 6 specialised analysts + CIO synthesis             | One blended view    | One blended view           |
-| **Smart-money flow signals** | Insider trades · short interest · 北向 · 龙虎榜 · 融资余额 — read by a dedicated Flow Analyst agent | Not exposed        | Not surfaced               |
+| **Smart-money flow signals** | Insider trades · short interest (US) · Northbound flow · Dragon-Tiger list (A-share) — read by a dedicated Flow Analyst agent | Not exposed | Not surfaced |
 | **Markets**                  | US · A-share · HK in one workstation               | Per-market silos    | Whatever it can web-search |
 | **Live streaming reasoning** | Token-by-token SSE; you can read agents *thinking* | n/a                 | Single block of text       |
 | **Pluggable data**           | yfinance + akshare free; Finnhub / Tushare / Longbridge optional | Locked-in vendor    | None                       |
@@ -86,7 +86,7 @@ Each ticker is read by a panel of LLM personas, then synthesised:
 | **Sentiment Analyst**       | News headlines, narrative shifts, crowdedness                                       |
 | **Macro Strategist**        | Sector + macro regime (rates, FX, AI capex, China demand, geopolitics)              |
 | **Risk Manager**            | Volatility, beta, drawdown risk, position sizing, stop zone                         |
-| **Flow Analyst**            | Insider transactions · short interest · 北向资金 · 龙虎榜 · 融资余额 — what *smart money* is doing |
+| **Flow Analyst**            | Insider transactions · short interest (US) · Northbound flow · Dragon-Tiger list (A-share) — what *smart money* is doing |
 | **Chief Investment Officer** | Resolves disagreements → action · conviction · horizon · entry · stop · key risks  |
 
 ## Three markets, one workstation
@@ -166,6 +166,32 @@ Designed for showing your work, not for spam.
 
 Every exported artefact carries the disclaimer below. Nothing leaks API keys, paths, or local config.
 
+## Scope & limitations
+
+Argus is **a single-user research tool that runs on your laptop**, not a multi-tenant
+SaaS. A few things worth knowing up-front, in honest terms:
+
+- **No authentication.** The local HTTP API trusts whoever can reach the port.
+  Don't bind it to a public IP. See [SECURITY.md](SECURITY.md).
+- **Free data has limits.** yfinance and akshare are best-effort public endpoints
+  — they rate-limit, occasionally rename columns, and can return empty for
+  thinly-covered tickers. Argus mitigates with TTL caching and a Finnhub fallback
+  for news; for serious use, plug in a paid feed (Tushare Pro, Finnhub real-time,
+  Longbridge).
+- **"Real-time" means 5-second polling.** Argus polls the underlying adapters; it
+  is not wired to vendor-native streaming. Quotes can lag a few seconds.
+- **Free-tier LLM streams sometimes drop.** NVIDIA NIM free tier in particular
+  closes long streams mid-flight; the CIO call retries once on transport failures,
+  and analyst cards display an explicit notice if a model returned no content.
+- **What's wired today** in the Flow Analyst: insider transactions + short interest
+  for US tickers; Northbound (Stock Connect) flow + Dragon-Tiger list for A-shares.
+  HK flow signals and 融资余额 are placeholders pending future work — when you analyse
+  those tickers the Flow Analyst will say so explicitly rather than fabricate numbers.
+
+If you want to run Argus somewhere other than localhost, treat that as a
+project rather than a config flip — the [SECURITY.md](SECURITY.md) hardening
+checklist is a starting point.
+
 ## Acknowledgements
 
 Argus stands on the shoulders of [yfinance](https://github.com/ranaroussi/yfinance), [akshare](https://github.com/akfamily/akshare), [FastAPI](https://fastapi.tiangolo.com/), [Recharts](https://recharts.org/), and [TradingView Lightweight Charts](https://tradingview.github.io/lightweight-charts/).
@@ -186,7 +212,7 @@ Argus stands on the shoulders of [yfinance](https://github.com/ranaroussi/yfinan
 ### 用一百只眼睛盯每一个市场。
 
 **Argus** 是一个开源 **AI 投资委员会**，覆盖 美股 · A 股 · 港股。
-六位分工不同的 LLM 分析师（含**业内独有的资金流分析师**：读懂内幕交易 / 北向资金 / 龙虎榜 / 融资余额 / 空头持仓）+ 一位首席投资官（CIO）实时辩论一只股票，并给出最终判断——
+六位分工不同的 LLM 分析师（含**业内独有的资金流分析师**：读懂内幕交易、空头持仓（美股）、北向资金、龙虎榜（A 股））+ 一位首席投资官（CIO）实时辩论一只股票，并给出最终判断——
 全程 token 级流式呈现，UI 是质感不输付费产品的玻璃拟态界面。
 
 ### 为什么是 Argus
@@ -219,7 +245,7 @@ cd ../frontend && npm install && npm run dev
 | 情绪分析师      | 新闻头条 · 叙事变化 · 拥挤度                                                  |
 | 宏观策略师      | 行业 + 宏观周期（利率 / 汇率 / AI 资本开支 / 中国需求 / 地缘）                |
 | 风险经理        | 波动率 · Beta · 回撤风险 · 仓位区间 · 止损                                    |
-| 资金流分析师    | 内幕交易 · 空头持仓 · 北向资金 · 龙虎榜 · 融资余额——读懂"聪明钱"在做什么     |
+| 资金流分析师    | 内幕交易 · 空头持仓（美股）· 北向资金 · 龙虎榜（A 股）——读懂"聪明钱"在做什么     |
 | 首席投资官（CIO） | 综合所有观点 → 操作 · 置信度 · 持有期 · 入场区间 · 止损 · 主要风险            |
 
 ### 自由切换 LLM 与数据源
