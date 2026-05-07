@@ -8,6 +8,7 @@ from typing import Optional
 
 import yfinance as yf
 
+from ..utils import logger
 from .base import (
     Candle,
     Fundamentals,
@@ -179,3 +180,38 @@ class HKAdapter(MarketAdapter):
             )
             for code, display in search_hk(q, limit=limit)
         ]
+
+    async def _news(self, symbol: str, limit: int = 10) -> list[dict]:
+        """yfinance HK news — works for major tickers (Tencent, Alibaba, …).
+
+        Long-tail HK names commonly return empty; the news aggregator will
+        attempt a Finnhub fallback after this, though Finnhub's free tier
+        also lacks HK company-news coverage. When neither has anything,
+        the UI shows an honest "no news available" state.
+        """
+        code = _hk_strip(symbol)
+        yf_sym = _hk_yf(code)
+        try:
+            items = await _to_thread(lambda: yf.Ticker(yf_sym).news or [])
+        except Exception as e:
+            logger.warning(f"yfinance HK news failed for {yf_sym}: {e}")
+            return []
+        out: list[dict] = []
+        for it in items[:limit]:
+            content = it.get("content") or it
+            out.append({
+                "title": content.get("title", ""),
+                "publisher": (
+                    (content.get("provider") or {}).get("displayName")
+                    if isinstance(content.get("provider"), dict)
+                    else content.get("publisher")
+                ),
+                "url": (
+                    (content.get("canonicalUrl") or {}).get("url")
+                    if isinstance(content.get("canonicalUrl"), dict)
+                    else content.get("link")
+                ),
+                "published": content.get("pubDate") or content.get("providerPublishTime"),
+                "summary": (content.get("summary", "") or "")[:500],
+            })
+        return out
