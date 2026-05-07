@@ -1,0 +1,213 @@
+@import "tailwindcss";
+
+/* =========================================================================
+   Theme tokens (Tailwind v4 @theme maps these to CSS vars,
+   so utilities like bg-bg / text-text / border-border resolve to the
+   active theme without rebuilding.)
+   ========================================================================= */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-primary: #7c3aed;
+  --color-primary-2: #06b6d4;
+  --color-bull: #10b981;
+  --color-bear: #f43f5e;
+  --color-warn: #f59e0b;
+}
+
+/* ---- Dark theme (default) ---- */
+:root,
+:root[data-theme="dark"] {
+  --bg: #07080d;
+  --surface: rgba(255, 255, 255, 0.04);
+  --surface-2: #141826;
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e8eaf2;
+  --text-2: #cbd0dd;
+  --muted: #8a91a8;
+  --faint: #5b6275;
+
+  --hero-mesh: radial-gradient(40% 60% at 30% 20%, rgba(124, 58, 237, 0.35), transparent 60%),
+               radial-gradient(35% 60% at 70% 30%, rgba(6, 182, 212, 0.30), transparent 60%),
+               radial-gradient(40% 50% at 50% 80%, rgba(236, 72, 153, 0.20), transparent 60%);
+
+  --body-bg:
+    radial-gradient(1200px 600px at 10% -10%, rgba(124, 58, 237, 0.18), transparent 60%),
+    radial-gradient(1000px 500px at 110% 0%, rgba(6, 182, 212, 0.12), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(244, 63, 94, 0.10), transparent 60%),
+    var(--bg);
+
+  --glass-bg: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015));
+  --glass-strong-bg: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  --glass-strong-border: rgba(255, 255, 255, 0.10);
+
+  --scroll-thumb: rgba(255, 255, 255, 0.10);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.18);
+
+  color-scheme: dark;
+}
+
+/* ---- Light theme ---- */
+:root[data-theme="light"] {
+  --bg: #f5f7fb;
+  --surface: rgba(15, 23, 42, 0.04);
+  --surface-2: #ffffff;
+  --border: rgba(15, 23, 42, 0.10);
+  --text: #0f172a;
+  --text-2: #1f2937;
+  --muted: #64748b;
+  --faint: #94a3b8;
+
+  --hero-mesh: radial-gradient(40% 60% at 30% 20%, rgba(124, 58, 237, 0.18), transparent 60%),
+               radial-gradient(35% 60% at 70% 30%, rgba(6, 182, 212, 0.18), transparent 60%),
+               radial-gradient(40% 50% at 50% 80%, rgba(236, 72, 153, 0.10), transparent 60%);
+
+  --body-bg:
+    radial-gradient(1200px 600px at 10% -10%, rgba(124, 58, 237, 0.07), transparent 60%),
+    radial-gradient(1000px 500px at 110% 0%, rgba(6, 182, 212, 0.05), transparent 60%),
+    radial-gradient(900px 600px at 50% 110%, rgba(244, 63, 94, 0.04), transparent 60%),
+    var(--bg);
+
+  --glass-bg: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.6));
+  --glass-strong-bg: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+  --glass-strong-border: rgba(15, 23, 42, 0.08);
+
+  --scroll-thumb: rgba(15, 23, 42, 0.16);
+  --scroll-thumb-hover: rgba(15, 23, 42, 0.28);
+
+  color-scheme: light;
+}
+
+html, body, #root { height: 100%; }
+
+/* Root font size bump — every Tailwind size that uses rem (text-xs, text-sm,
+   text-base, padding, gaps) scales with this. 16 → 17 px is ~6% extra
+   breathing room without breaking any existing layout. */
+html { font-size: 17px; }
+
+body {
+  background: var(--body-bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+/* Glass cards — track the theme via vars */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+}
+.glass-strong {
+  background: var(--glass-strong-bg);
+  border: 1px solid var(--glass-strong-border);
+  backdrop-filter: blur(20px) saturate(130%);
+}
+.mesh-bg {
+  background: var(--hero-mesh);
+  filter: blur(30px);
+  animation: meshFloat 18s ease-in-out infinite alternate;
+}
+@keyframes meshFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(2%, -2%) scale(1.05); }
+  100% { transform: translate(-2%, 2%) scale(0.97); }
+}
+
+.gradient-border { position: relative; }
+.gradient-border::before {
+  content: "";
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(90deg, #7c3aed, #06b6d4, #f43f5e, #7c3aed);
+  background-size: 300% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: gradientShift 6s linear infinite;
+}
+@keyframes gradientShift { to { background-position: 300% 0%; } }
+
+.live-dot {
+  width: 8px; height: 8px; border-radius: 9999px;
+  background: var(--color-bull);
+  box-shadow: 0 0 0 0 rgba(16,185,129,0.6);
+  animation: pulse 1.6s ease-out infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.55); }
+  70% { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
+
+.num-fade-in { animation: numIn 0.35s ease-out; }
+@keyframes numIn { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+.text-bull { color: var(--color-bull); }
+.text-bear { color: var(--color-bear); }
+.bg-bull-soft { background: rgba(16,185,129,0.10); }
+.bg-bear-soft { background: rgba(244,63,94,0.10); }
+
+/* =========================================================================
+   Light-theme remapping for the existing zinc-* / white-/black- utilities used
+   throughout the codebase. Lets the whole app reskin without a class-by-class
+   rewrite. (Dark theme keeps Tailwind defaults.)
+   ========================================================================= */
+:root[data-theme="light"] .text-zinc-100 { color: #0f172a; }
+:root[data-theme="light"] .text-zinc-200 { color: #1f2937; }
+:root[data-theme="light"] .text-zinc-300 { color: #334155; }
+:root[data-theme="light"] .text-zinc-400 { color: #475569; }
+:root[data-theme="light"] .text-zinc-500 { color: #64748b; }
+:root[data-theme="light"] .text-zinc-600 { color: #94a3b8; }
+
+:root[data-theme="light"] .border-white\/5  { border-color: rgba(15,23,42,0.06); }
+:root[data-theme="light"] .border-white\/10 { border-color: rgba(15,23,42,0.10); }
+:root[data-theme="light"] .border-white\/20 { border-color: rgba(15,23,42,0.16); }
+
+:root[data-theme="light"] .bg-white\/5      { background-color: rgba(15,23,42,0.04); }
+:root[data-theme="light"] .bg-white\/10     { background-color: rgba(15,23,42,0.06); }
+:root[data-theme="light"] .bg-white\/\[0\.03\] { background-color: rgba(15,23,42,0.03); }
+:root[data-theme="light"] .bg-white\/\[0\.04\] { background-color: rgba(15,23,42,0.04); }
+:root[data-theme="light"] .bg-white\/\[0\.06\] { background-color: rgba(15,23,42,0.06); }
+:root[data-theme="light"] .hover\:bg-white\/5:hover  { background-color: rgba(15,23,42,0.04); }
+:root[data-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(15,23,42,0.06); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover { background-color: rgba(15,23,42,0.03); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.04\]:hover { background-color: rgba(15,23,42,0.04); }
+:root[data-theme="light"] .hover\:bg-white\/\[0\.06\]:hover { background-color: rgba(15,23,42,0.06); }
+
+:root[data-theme="light"] .bg-black\/10 { background-color: rgba(255,255,255,0.7); }
+:root[data-theme="light"] .bg-black\/20 { background-color: rgba(255,255,255,0.65); }
+
+:root[data-theme="light"] .text-cyan-300 { color: #0e7490; }
+:root[data-theme="light"] .text-cyan-400 { color: #0891b2; }
+:root[data-theme="light"] .hover\:text-cyan-200:hover { color: #155e75; }
+:root[data-theme="light"] .hover\:text-cyan-300:hover { color: #0e7490; }
+
+:root[data-theme="light"] kbd { color: #475569; border-color: rgba(15,23,42,0.16); }
+
+/* Verdict accent boxes — soften on light */
+:root[data-theme="light"] .bg-emerald-500\/5 { background-color: rgba(16,185,129,0.08); }
+:root[data-theme="light"] .bg-rose-500\/5    { background-color: rgba(244,63,94,0.08); }
+:root[data-theme="light"] .bg-amber-500\/5   { background-color: rgba(245,158,11,0.10); }
+
+/* Primary button shadow looks ugly on light bg — soften */
+:root[data-theme="light"] .shadow-\[0_0_20px_-6px_rgba\(124\,58\,237\,0\.6\)\] {
+  box-shadow: 0 6px 20px -10px rgba(124, 58, 237, 0.5);
+}

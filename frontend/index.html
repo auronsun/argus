@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Argus · Multi-Market Stock Intelligence</title>
+    <meta name="description" content="AI investment-committee for US, A-shares, and HK markets." />
+    <link rel="preconnect" href="https://rsms.me/" />
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" />
+    <script>
+      // Apply persisted theme + lang BEFORE React hydrates to avoid flash.
+      try {
+        var t = localStorage.getItem("argus.theme") || "dark";
+        var l = localStorage.getItem("argus.lang") || (navigator.language || "en").startsWith("zh") ? "zh" : "en";
+        document.documentElement.setAttribute("data-theme", t);
+        document.documentElement.setAttribute("lang", l);
+      } catch (e) {}
+    </script>
+    <style>
+      body { margin: 0; -webkit-font-smoothing: antialiased; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
