@@ -18,7 +18,7 @@
  * tab close drops everything. (localStorage persistence would add cross-tab
  * survival but is overkill for v1.)
  */
-import { streamCommittee, type CommitteeEvent } from "@/api/client";
+import { streamCommittee, streamRetryAgent, type CommitteeEvent } from "@/api/client";
 import { addHistory } from "./history";
 
 export type AgentStatus = "idle" | "thinking" | "done" | "error";
@@ -121,6 +121,45 @@ class CommitteeStore {
     this.closers.delete(key);
     this.runs.delete(key);
     this.emit(key);
+  }
+
+  /** Re-run a single analyst (or the CIO) without wasting calls on the
+   * five other analysts. We pass their previously-captured texts to the
+   * backend so the CIO can resynthesise. */
+  retryAgent(
+    symbol: string,
+    lang: "en" | "zh",
+    role: "technical" | "fundamental" | "sentiment" | "macro" | "risk" | "flow" | "cio",
+  ): void {
+    const key = this.k(symbol, lang);
+    const state = this.runs.get(key);
+    if (!state || state.running) return;
+
+    // Collect existing analyst texts EXCEPT the role we're retrying.
+    // (CIO is rerun on every retry; its prior text is meaningless.)
+    const existing: Record<string, string> = {};
+    for (const r of ROLES) {
+      if (r === role) continue;
+      const txt = state.agents[r]?.text ?? "";
+      if (txt.trim()) existing[r] = txt;
+    }
+
+    // Optimistic UI: clear the agent we're about to rerun + mark CIO as
+    // queued again (it will rerun after the analyst is done).
+    if (role !== "cio") {
+      state.agents[role] = { role, status: "thinking", text: "" };
+    }
+    state.agents.cio = { role: "cio", status: "idle", text: "" };
+    state.verdict = null;
+    state.running = true;
+    state.completedAt = null;
+    this.emit(key);
+
+    const closer = streamRetryAgent(
+      symbol, { role, lang, existing_outputs: existing },
+      (ev) => this.handleEvent(key, ev),
+    );
+    this.closers.set(key, closer);
   }
 
   private handleEvent(key: string, ev: CommitteeEvent): void {

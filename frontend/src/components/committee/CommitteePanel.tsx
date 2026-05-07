@@ -35,6 +35,9 @@ export function CommitteePanel({ symbol }: { symbol: string }) {
 
   function start() { committeeStore.start(symbol, lang); }
   function reset() { committeeStore.reset(symbol, lang); }
+  function retryAgent(role: "technical" | "fundamental" | "sentiment" | "macro" | "risk" | "flow" | "cio") {
+    committeeStore.retryAgent(symbol, lang, role);
+  }
 
   return (
     <Card className="!p-0">
@@ -69,7 +72,11 @@ export function CommitteePanel({ symbol }: { symbol: string }) {
 
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-3">
         {(["technical", "fundamental", "sentiment", "macro", "risk", "flow"] as const).map((r) => (
-          <AgentCard key={r} agent={agents[r]} />
+          <AgentCard
+            key={r}
+            agent={agents[r]}
+            onRetry={running ? undefined : () => retryAgent(r)}
+          />
         ))}
       </div>
 
@@ -77,7 +84,11 @@ export function CommitteePanel({ symbol }: { symbol: string }) {
         <CardHeader title={t("comm.synthesis")} />
         {/* CIO emits raw JSON tokens — hide them; the VerdictCard below renders
             the structured payload nicely. The card header still shows progress. */}
-        <AgentCard agent={agents.cio} hideText />
+        <AgentCard
+          agent={agents.cio}
+          hideText
+          onRetry={running ? undefined : () => retryAgent("cio")}
+        />
         <AnimatePresence>
           {state?.verdict && (
             <motion.div

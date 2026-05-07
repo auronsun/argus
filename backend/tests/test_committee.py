@@ -147,3 +147,63 @@ async def test_lang_en_does_not_inject_chinese(fake_adapter):
     sys_msg = cap.captured[0][0]
     assert "中文" not in sys_msg.content
     assert "Respond in English" in sys_msg.content
+
+
+# ----------------------------------------------------------------------------
+# Per-agent retry
+# ----------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_retry_single_analyst_reruns_only_that_role_plus_cio(fake_adapter):
+    """stream_retry should fire agent_start + agent_done for the requested
+    role, then for cio. NOT for the other 5 analysts."""
+    cap = _CapturingClient()
+    committee = InvestmentCommittee(llm=cap, lang="en")
+    events = []
+    existing = {
+        "technical": "previous technical output",
+        "fundamental": "previous fundamental output",
+        "sentiment": "previous sentiment output",
+        "macro": "previous macro output",
+        "flow": "previous flow output",
+    }
+    async for ev in committee.stream_retry(
+        "AAPL", role="risk", existing_outputs=existing,
+    ):
+        events.append(ev)
+
+    started = [e.role for e in events if e.type == "agent_start"]
+    assert started == ["risk", "cio"], f"got {started}"
+    # Only TWO LLM calls were issued (risk + cio), not seven.
+    assert len(cap.captured) == 2
+
+    # Last call (cio) must include the supplied existing outputs verbatim.
+    cio_user_msg = cap.captured[-1][1].content
+    for prior in existing.values():
+        assert prior in cio_user_msg
+
+
+@pytest.mark.asyncio
+async def test_retry_cio_only_skips_analyst_call(fake_adapter):
+    """When role='cio', no analyst is rerun — only CIO."""
+    cap = _CapturingClient()
+    committee = InvestmentCommittee(llm=cap, lang="en")
+    events = []
+    async for ev in committee.stream_retry(
+        "AAPL", role="cio",
+        existing_outputs={"technical": "t", "fundamental": "f", "sentiment": "s",
+                          "macro": "m", "risk": "r", "flow": "fl"},
+    ):
+        events.append(ev)
+
+    started = [e.role for e in events if e.type == "agent_start"]
+    assert started == ["cio"]
+    assert len(cap.captured) == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_unknown_role_raises():
+    committee = InvestmentCommittee(llm=_CapturingClient(), lang="en")
+    with pytest.raises(ValueError):
+        async for _ in committee.stream_retry("AAPL", role="bogus", existing_outputs={}):  # type: ignore[arg-type]
+            pass

@@ -176,3 +176,73 @@ export function streamCommittee(
   es.onerror = () => es.close();
   return () => es.close();
 }
+
+/**
+ * Per-agent retry. Streams events for a single analyst (or just the CIO),
+ * passing the previously-captured outputs of the OTHER analysts so we
+ * don't re-run them. SSE shape matches `streamCommittee`. Implemented
+ * with fetch + ReadableStream (rather than EventSource) because the
+ * existing analyst outputs are too large for a query string and need to
+ * be POSTed.
+ */
+export function streamRetryAgent(
+  symbol: string,
+  body: {
+    role: "technical" | "fundamental" | "sentiment" | "macro" | "risk" | "flow" | "cio";
+    lang: "en" | "zh";
+    existing_outputs: Record<string, string>;
+  },
+  onEvent: (ev: CommitteeEvent) => void,
+): () => void {
+  const ctrl = new AbortController();
+
+  (async () => {
+    try {
+      const res = await fetch(`/api/committee/retry/${encodeURIComponent(symbol)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      if (!res.ok || !res.body) {
+        onEvent({
+          type: "error", role: null, agent_name: "",
+          text: `retry failed: ${res.status}`, payload: {},
+        } as CommitteeEvent);
+        onEvent({ type: "done", role: null, agent_name: "", text: "", payload: {} } as CommitteeEvent);
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        // Each SSE record is terminated with a blank line.
+        let sep: number;
+        while ((sep = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          if (block.startsWith("data: ")) {
+            try {
+              onEvent(JSON.parse(block.slice(6)) as CommitteeEvent);
+            } catch {
+              /* skip malformed */
+            }
+          }
+        }
+      }
+    } catch (e: any) {
+      if (e?.name !== "AbortError") {
+        onEvent({
+          type: "error", role: null, agent_name: "",
+          text: e?.message ?? String(e), payload: {},
+        } as CommitteeEvent);
+        onEvent({ type: "done", role: null, agent_name: "", text: "", payload: {} } as CommitteeEvent);
+      }
+    }
+  })();
+
+  return () => ctrl.abort();
+}

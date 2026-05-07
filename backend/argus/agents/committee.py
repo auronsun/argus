@@ -43,6 +43,22 @@ LANGUAGE_INSTRUCTIONS: dict[str, dict[Language, str]] = {
     },
 }
 
+# Appended to every analyst persona's system prompt to keep the rendered
+# UI consistent across providers. Different LLMs default to wildly
+# different markdown habits (Claude likes ## headers, GPT likes **bold**,
+# minimax prefers numbered lists, etc.); this normalises them.
+ANALYST_FORMAT_GUIDE = (
+    "\n\nFORMAT RULES — these are strict and override any default style:\n"
+    "1. Plain prose only. No markdown headers (no '#', '##', '###').\n"
+    "2. No bold/italic markers (no **bold**, *italic*, _underscores_).\n"
+    "3. No bullet-point lists unless explicitly asked. Write in sentences.\n"
+    "4. No empty paragraphs or section dividers.\n"
+    "5. Keep total length to 4-6 sentences plus one final verdict line.\n"
+    "6. End with a single line: '<Direction>, conviction X/5.' "
+    "(e.g. 'Bullish, conviction 4/5.' / 'Bearish, conviction 2/5.' / "
+    "'Neutral, conviction 3/5.')."
+)
+
 
 AGENT_PERSONAS: dict[AgentRole, dict[str, str]] = {
     "technical": {
@@ -167,7 +183,10 @@ class InvestmentCommittee:
     def _system_prompt(self, role: AgentRole) -> str:
         base = AGENT_PERSONAS[role]["system"]
         bucket = "cio" if role == "cio" else "analyst"
-        return base + "\n\n" + LANGUAGE_INSTRUCTIONS[bucket][self.lang]
+        # Analyst format guide is appended for ALL non-CIO roles so output
+        # is uniform; CIO needs structured JSON, not prose, so it skips this.
+        format_guide = "" if role == "cio" else ANALYST_FORMAT_GUIDE
+        return base + format_guide + "\n\n" + LANGUAGE_INSTRUCTIONS[bucket][self.lang]
 
     async def gather_context(self, symbol: str, market: Market | None = None) -> dict[str, Any]:
         """Fetch the data each analyst will read.
@@ -517,6 +536,44 @@ class InvestmentCommittee:
             await asyncio.gather(*tasks, return_exceptions=True)
 
         # CIO must wait for all analysts to settle before synthesising.
+        async for ev in self._run_cio(ctx, analyst_outputs):
+            yield ev
+
+    async def stream_retry(
+        self,
+        symbol: str,
+        role: AgentRole,
+        existing_outputs: dict[str, str],
+        market: Market | None = None,
+    ) -> AsyncIterator[CommitteeEvent]:
+        """Re-run a single analyst (or just the CIO) using outputs the client
+        still has from the previous run. Saves the cost of re-running the
+        five other analysts when only one needed retrying.
+
+        - role="cio": just rerun the CIO with the supplied analyst_outputs.
+        - role=any analyst: rerun that analyst, then rerun the CIO with
+          the freshly produced output spliced into the prior outputs.
+        """
+        if role not in ("technical", "fundamental", "sentiment", "macro", "risk", "flow", "cio"):
+            raise ValueError(f"unknown role: {role}")
+
+        ctx = await self.gather_context(symbol, market)
+        analyst_outputs: dict[AgentRole, str] = {
+            r: text for r, text in (existing_outputs or {}).items()
+            if r in ("technical", "fundamental", "sentiment", "macro", "risk", "flow")
+            and isinstance(text, str) and text
+        }  # type: ignore[misc]
+
+        if role != "cio":
+            # Re-run the chosen analyst, capture its new output.
+            buf: list[str] = []
+            async for ev in self._run_agent(role, ctx):
+                if ev.type == "agent_token":
+                    buf.append(ev.text)
+                yield ev
+            analyst_outputs[role] = "".join(buf)
+
+        # Always rerun CIO so the verdict reflects the latest outputs.
         async for ev in self._run_cio(ctx, analyst_outputs):
             yield ev
 

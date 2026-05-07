@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { Activity, BarChart3, Newspaper, Globe2, Shield, Target, Bot, Waves, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, Newspaper, Globe2, Shield, Target, Bot, Waves, RefreshCcw, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { cleanAgentText } from "@/lib/clean";
 import { useT } from "@/lib/i18n";
 import { Spinner } from "@/components/ui/Spinner";
 
@@ -29,7 +30,16 @@ export interface AgentState {
   text: string;
 }
 
-export function AgentCard({ agent, hideText = false }: { agent: AgentState; hideText?: boolean }) {
+export function AgentCard({
+  agent,
+  hideText = false,
+  onRetry,
+}: {
+  agent: AgentState;
+  hideText?: boolean;
+  /** When provided, a Retry button is shown on error / empty-done states. */
+  onRetry?: () => void;
+}) {
   const t = useT();
   const theme = ROLE_THEME[agent.role] ?? {
     gradient: "", glow: "", iconBg: "bg-white/10", iconColor: "text-zinc-300",
@@ -40,6 +50,11 @@ export function AgentCard({ agent, hideText = false }: { agent: AgentState; hide
     agent.status === "thinking" ? "agent.status.thinking" :
     agent.status === "done" ? "agent.status.done" :
     agent.status === "error" ? "agent.status.error" : "agent.status.queued";
+
+  const text = cleanAgentText(agent.text);
+  const isEmptyDone = agent.status === "done" && text.trim() === "";
+  const isError = agent.status === "error";
+  const showRetryBtn = !!onRetry && (isError || isEmptyDone);
 
   return (
     <motion.div
@@ -63,23 +78,31 @@ export function AgentCard({ agent, hideText = false }: { agent: AgentState; hide
               <div className="text-[10px] uppercase tracking-wider text-zinc-500">{t(statusKey)}</div>
             </div>
           </div>
-          {agent.status === "thinking" && <Spinner />}
-          {agent.status === "done" && <span className="text-emerald-400 text-xs">●</span>}
+          <div className="flex items-center gap-2">
+            {showRetryBtn && (
+              <button
+                onClick={onRetry}
+                className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-white/10 text-zinc-300 hover:text-zinc-100 hover:bg-white/5 transition-colors"
+                title={t("agent.retry")}
+              >
+                <RefreshCcw className="w-3 h-3" />
+                {t("agent.retry")}
+              </button>
+            )}
+            {agent.status === "thinking" && <Spinner />}
+            {agent.status === "done" && !isEmptyDone && <span className="text-emerald-400 text-xs">●</span>}
+          </div>
         </div>
         {!hideText && (
           <div className="mt-3 text-sm leading-relaxed text-zinc-300 whitespace-pre-wrap min-h-[1em] max-h-[260px] overflow-y-auto pr-1">
-            {agent.text}
+            {text}
             {agent.status === "thinking" && (
               <span className="inline-block w-2 h-4 bg-cyan-400/70 align-middle ml-0.5 animate-pulse" />
             )}
-            {/* Some providers (esp. NVIDIA NIM free tier) close the stream
-                cleanly without emitting any tokens. We surface that as an
-                explicit "(no content returned)" rather than rendering a
-                deceptively-blank "done" card. */}
-            {agent.status === "done" && agent.text.trim() === "" && (
+            {isEmptyDone && (
               <span className="italic text-zinc-500">{t("agent.noOutput")}</span>
             )}
-            {agent.status === "error" && agent.text.trim() === "" && (
+            {isError && text.trim() === "" && (
               <span className="italic text-rose-300">{t("agent.runFailed")}</span>
             )}
           </div>

@@ -97,6 +97,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     "agent.status.queued": "queued",
     "agent.noOutput": "(model returned no content — try re-running or switching provider)",
     "agent.runFailed": "(this analyst's run failed — see details in the system log)",
+    "agent.retry": "Retry",
 
     // History page
     "history.title":         "Recent analyses",
@@ -302,6 +303,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     "agent.status.queued": "等待中",
     "agent.noOutput": "（模型返回了空内容——可重试或换 provider）",
     "agent.runFailed": "（这位分析师本次推理失败——详情见系统日志）",
+    "agent.retry": "重试",
 
     // History page
     "history.title":         "历史分析",
