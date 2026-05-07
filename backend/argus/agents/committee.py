@@ -46,15 +46,24 @@ LANGUAGE_INSTRUCTIONS: dict[str, dict[Language, str]] = {
 # Appended to every analyst persona's system prompt to keep the rendered
 # UI consistent across providers. Different LLMs default to wildly
 # different markdown habits (Claude likes ## headers, GPT likes **bold**,
-# minimax prefers numbered lists, etc.); this normalises them.
+# minimax prefers numbered lists, etc.); this normalises them. Also
+# explicitly instructs against ticker-drift hallucinations where the
+# model substitutes a different company that it "thinks" the ticker is.
 ANALYST_FORMAT_GUIDE = (
-    "\n\nFORMAT RULES — these are strict and override any default style:\n"
-    "1. Plain prose only. No markdown headers (no '#', '##', '###').\n"
-    "2. No bold/italic markers (no **bold**, *italic*, _underscores_).\n"
-    "3. No bullet-point lists unless explicitly asked. Write in sentences.\n"
-    "4. No empty paragraphs or section dividers.\n"
-    "5. Keep total length to 4-6 sentences plus one final verdict line.\n"
-    "6. End with a single line: '<Direction>, conviction X/5.' "
+    "\n\nSTRICT RULES — these override any default style and prior beliefs:\n"
+    "1. The ANALYSIS TARGET (ticker + company name) is given in the user "
+    "message. Use ONLY that company. Do NOT substitute any other company "
+    "even if you believe the ticker represents one. If your training data "
+    "disagrees with the data shown, the data wins.\n"
+    "2. Begin your first sentence by referring to the target by both ticker "
+    "and the exact company name as given (e.g. '01258.HK (China Nonferrous "
+    "Mining) is …'). This is mandatory.\n"
+    "3. Plain prose only. No markdown headers (no '#', '##', '###').\n"
+    "4. No bold/italic markers (no **bold**, *italic*, _underscores_).\n"
+    "5. No bullet-point lists unless explicitly asked. Write in sentences.\n"
+    "6. No empty paragraphs or section dividers.\n"
+    "7. Keep total length to 4-6 sentences plus one final verdict line.\n"
+    "8. End with a single line: '<Direction>, conviction X/5.' "
     "(e.g. 'Bullish, conviction 4/5.' / 'Bearish, conviction 2/5.' / "
     "'Neutral, conviction 3/5.')."
 )
@@ -254,11 +263,21 @@ class InvestmentCommittee:
         latest = ctx["indicators_latest"]
         signals = ctx["signals"]
         news = ctx["news"][:5]
+        company = f.get("name") or q.get("name") or q["symbol"]
+        # A high-prominence header. The duplicated banner + reminder fights
+        # ticker-drift hallucination on flaky models — they're far more
+        # likely to lock onto the right company when the prompt screams it.
         common = (
-            f"Ticker: {q['symbol']} ({f.get('name') or q.get('name')})\n"
-            f"Market: {q['market']}  Currency: {q['currency']}\n"
-            f"Last: {_fmt_num(q['price'])}  Δ%: {_fmt_num(q['change_pct'])}  "
+            "==================== ANALYSIS TARGET ====================\n"
+            f"Ticker:   {q['symbol']}\n"
+            f"Company:  {company}\n"
+            f"Market:   {q['market']}    Currency: {q['currency']}\n"
+            f"Last:     {_fmt_num(q['price'])}  Δ%: {_fmt_num(q['change_pct'])}  "
             f"Mkt cap: {_fmt_num(q.get('market_cap'), 0)}\n"
+            "=========================================================\n"
+            f"You are analysing {q['symbol']} ({company}). "
+            "Do not analyse any other company; the data below is for THIS "
+            "specific ticker only.\n"
         )
 
         if role == "technical":
@@ -430,15 +449,25 @@ class InvestmentCommittee:
             f"### {AGENT_PERSONAS[r]['name']}\n{txt}" for r, txt in truncated.items()
         )
         q = ctx["quote"]
+        company = ctx["fundamentals"].get("name") or q.get("name") or q["symbol"]
         contrib_line = f"Analysts contributing: {', '.join(contributing) or '(none)'}"
         if missing:
-            contrib_line += f"\nAnalysts UNAVAILABLE this run: {', '.join(missing)} — discount conviction accordingly."
+            contrib_line += (
+                f"\nAnalysts UNAVAILABLE this run: {', '.join(missing)} — "
+                "discount conviction accordingly."
+            )
         user = (
-            f"Ticker: {q['symbol']} {ctx['fundamentals'].get('name','')} "
-            f"@ {_fmt_num(q['price'])} {q['currency']}\n"
+            "==================== ANALYSIS TARGET ====================\n"
+            f"Ticker:   {q['symbol']}\n"
+            f"Company:  {company}\n"
+            f"Last:     {_fmt_num(q['price'])} {q['currency']}\n"
+            "=========================================================\n"
+            f"Synthesise the verdict for {q['symbol']} ({company}). Use ONLY "
+            "this company; ignore any prior knowledge that contradicts the "
+            "data and analyst notes below.\n\n"
             f"{contrib_line}\n\n"
             f"=== Analyst Debate ===\n{debate_block}\n\n"
-            "Synthesise. Output STRICT JSON only — no prose, no code fences."
+            "Output STRICT JSON only — no prose, no code fences."
         )
         messages = [
             Message(role="system", content=self._system_prompt("cio")),

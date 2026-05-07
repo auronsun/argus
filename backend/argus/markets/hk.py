@@ -53,7 +53,9 @@ class HKAdapter(MarketAdapter):
         return Quote(
             symbol=self.normalize(code),
             market="HK",
-            name=full.get("shortName") or full.get("longName") or yf_sym,
+            # Prefer longName for HK — yfinance shortName is often a useless
+            # ALL-CAPS slug like "CHINFMINING" that confuses LLMs.
+            name=full.get("longName") or full.get("shortName") or yf_sym,
             price=price,
             change=change,
             change_pct=change_pct,
@@ -108,7 +110,7 @@ class HKAdapter(MarketAdapter):
         return Fundamentals(
             symbol=self.normalize(code),
             market="HK",
-            name=info.get("shortName") or info.get("longName") or yf_sym,
+            name=info.get("longName") or info.get("shortName") or yf_sym,
             sector=info.get("sector"),
             industry=info.get("industry"),
             market_cap=info.get("marketCap"),

@@ -52,7 +52,9 @@ class USAdapter(MarketAdapter):
         return Quote(
             symbol=sym,
             market="US",
-            name=full.get("shortName") or full.get("longName") or sym,
+            # Prefer longName — more descriptive for the LLM, and yfinance
+            # sometimes gives an obscure ALL-CAPS slug as shortName.
+            name=full.get("longName") or full.get("shortName") or sym,
             price=price,
             change=change,
             change_pct=change_pct,
@@ -108,7 +110,7 @@ class USAdapter(MarketAdapter):
         return Fundamentals(
             symbol=sym,
             market="US",
-            name=info.get("shortName") or info.get("longName") or sym,
+            name=info.get("longName") or info.get("shortName") or sym,
             sector=info.get("sector"),
             industry=info.get("industry"),
             market_cap=info.get("marketCap"),
